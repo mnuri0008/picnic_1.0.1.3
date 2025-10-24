@@ -40,7 +40,7 @@
     }
     /* Modals only block clicks when visible */
     .modal{display:none;pointer-events:none}
-    .modal[data-open="1"]{display:flex;z-index:50;pointer-events:auto}
+    .modal[data-open="1"]{display:flex;z-index:200;pointer-events:auto}
   
     /* Fullscreen login */
     body,html{height:100%}
@@ -120,7 +120,7 @@
 
   <div id="dlg-register" class="modal" role="dialog" aria-modal="true">
     <div class="card">
-      <span class="close" data-close="1" role="button" tabindex="0" data-close="1" onclick="hide('dlg-register')">✕</span>
+      <span class="close" data-close="1" role="button" tabindex="0" data-close="1" role="button" tabindex="0" data-close="1" onclick="hide('dlg-register')">✕</span>
       <h3 style="margin:0 0 12px">{{ 'Yeni Kullanıcı' if lang!='en' else 'Register' }}</h3>
       <div class="row" style="display:flex;gap:12px;margin-bottom:12px">
         <label class="field" style="flex:1"><input id="reg-username" placeholder="{{ 'Kullanıcı adı' if lang!='en' else 'Username' }}"></label>
@@ -133,7 +133,6 @@
         <label class="field" style="flex:1">
             <select id="reg-secret-q" style="width:100%;background:transparent;border:none;outline:none;color:var(--text)">
               <option value="pet">{{ 'İlk evcil hayvanınızın adı?' if lang!='en' else 'Name of your first pet?' }}</option>
-              <option value="school">{{ 'İlk okulunuzun adı?' if lang!='en' else 'Name of your first school?' }}</option>
               <option value="city">{{ 'Doğduğunuz şehir?' if lang!='en' else 'City where you were born?' }}</option>
               <option value="food">{{ 'En sevdiğiniz yemek?' if lang!='en' else 'Your favorite food?' }}</option>
             </select>
@@ -146,7 +145,7 @@
 
   <div id="dlg-forgot" class="modal" role="dialog" aria-modal="true">
     <div class="card">
-      <span class="close" data-close="1" role="button" tabindex="0" data-close="1" onclick="hide('dlg-forgot')">✕</span>
+      <span class="close" data-close="1" role="button" tabindex="0" data-close="1" role="button" tabindex="0" data-close="1" onclick="hide('dlg-forgot')">✕</span>
       <h3 style="margin:0 0 12px">{{ 'Şifre Sıfırla' if lang!='en' else 'Reset Password' }}</h3>
       <div class="row" style="display:flex;gap:12px;margin-bottom:12px">
         <label class="field" style="flex:1"><input id="fg-username" placeholder="{{ 'Kullanıcı adı' if lang!='en' else 'Username' }}"></label>
@@ -155,7 +154,6 @@
         <label class="field" style="flex:1">
           <select id="fg-secret-q" style="width:100%;background:transparent;border:none;outline:none;color:var(--text)">
             <option value="pet">{{ 'İlk evcil hayvanınızın adı?' if lang!='en' else 'Name of your first pet?' }}</option>
-            <option value="school">{{ 'İlk okulunuzun adı?' if lang!='en' else 'Name of your first school?' }}</option>
             <option value="city">{{ 'Doğduğunuz şehir?' if lang!='en' else 'City where you were born?' }}</option>
             <option value="food">{{ 'En sevdiğiniz yemek?' if lang!='en' else 'Your favorite food?' }}</option>
           </select>
@@ -302,6 +300,35 @@
           var href = a.getAttribute('href') + currentHash();
           location.href = href;
         });
+      });
+      if(location.hash==='#register'){ openM('dlg-register'); }
+      if(location.hash==='#forgot'){ openM('dlg-forgot'); }
+    })();
+
+  
+    // --- Delegated handlers + backdrop close ---
+    (function(){
+      function qs(id){return document.getElementById(id)}
+      function openM(id){var m=qs(id); if(m){m.setAttribute('data-open','1')}}
+      function closeM(id){var m=qs(id); if(m){m.removeAttribute('data-open')}}
+      async function handleClick(e){
+        var t=e.target;
+        // backdrop close: click outside .card
+        var m=t.closest('.modal');
+        if(m && m.getAttribute('data-open')==='1' && !t.closest('.card')){ m.removeAttribute('data-open'); return; }
+        // explicit close (x)
+        if(t.closest('[data-close]')){ var mm=t.closest('.modal'); if(mm){mm.removeAttribute('data-open')} return; }
+        if(t.closest('#btn-register')){ openM('dlg-register'); return; }
+        if(t.closest('#btn-forgot')){ openM('dlg-forgot'); return; }
+        if(t.closest('#btn-submit-register')){ await submitRegister(); return; }
+        if(t.closest('#btn-submit-forgot')){ await submitForgot(); return; }
+        if(t.closest('#btn-login')){ await doLogin(); return; }
+      }
+      document.addEventListener('click', function(e){ handleClick(e); }, true);
+      // Keep modal open across language toggle
+      function currentHash(){var r=qs('dlg-register'), f=qs('dlg-forgot'); if(r&&r.getAttribute('data-open')==='1')return '#register'; if(f&&f.getAttribute('data-open')==='1')return '#forgot'; return ''}
+      document.querySelectorAll('.toplang a').forEach(function(a){
+        a.addEventListener('click', function(ev){ev.preventDefault(); location.href = a.getAttribute('href')+currentHash();});
       });
       if(location.hash==='#register'){ openM('dlg-register'); }
       if(location.hash==='#forgot'){ openM('dlg-forgot'); }
