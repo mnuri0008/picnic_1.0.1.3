@@ -7,21 +7,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
 </head>
 <body>
-<div class="navbar mobile">
-  <a href="/" class="brand center">
-    <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon">
-    <span>Piknik Vakti</span>
-  </a>
-</div>
-<div class="right">
-    <label class="toggle small" title="Koyu Tema">
-      <input id="darkToggle" type="checkbox" onclick="document.documentElement.classList.toggle('dark')">
-      <span>Koyu</span>
-    </label>
-    <a href="/" class="badge">← Ana Sayfa</a>
-  </div>
-</div>
-
 <div class="container">
   <div class="header">
     <a href="/" class="badge">← Geri</a>
@@ -31,6 +16,7 @@
     </a>
   </div>
 
+  <h1>📅 Piknik Vakti — {{ code if not view else (code[:2] + '**') }}</h1>
   <div class="small">
     <span id="date">—</span> ·
     <b id="user">{{ username }}</b>
@@ -58,7 +44,7 @@
 
   <div class="card">
     <h2>🧺 Ürünler</h2>
-    <div id="list" class="list"></div>
+    <div id="list" class="list"></a>
   </div>
 </div>
 
@@ -478,6 +464,5 @@ document.querySelectorAll('.lang a[data-lang]').forEach(a=>{
 // Dinamik liste yenilemeleri için küçük tazeleme
 setInterval(translateList, 1200);
 </script>
-<div class="footer small">UI Update v1 — liste öğeleri, butonlar ve başlık alanı iyileştirildi.</div>
 </body>
 </html>

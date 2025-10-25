@@ -16,7 +16,7 @@
   </div>
   <div class="card">
     <h1 style="margin:0 0 6px">Şifremi Unuttum</h1>
-    <p class="small">E‑posta adresine bir doğrulama kodu gönderilecek. Kod geldikten sonra aynı formda kodu ve yeni şifreyi girin.</p>
+    <p class="small">Kullanıcı adını yaz, e‑posta kayıtlıysa kod yollanır. Aynı formda kod + yeni şifre girerek sıfırlarsın.</p>
     {% if error %}<div class="small" style="color:#ffb4b4;margin-bottom:8px">{{ error }}</div>{% endif %}
     {% if ok %}<div class="small" style="color:#b5ffb5;margin-bottom:8px">{{ ok }}</div>{% endif %}
     <form method="post" action="/auth/forgot">
@@ -27,7 +27,7 @@
         <button class="button primary" type="submit">Gönder / Doğrula</button>
       </div>
     </form>
-    <div style="margin-top:10px"><a class="small" href="/auth/login">Giriş sayfasına dön</a></div>
+    <div style="margin-top:10px"><a class="small" href="/auth/login">Giriş sayfasına dön</a></a>
   </div>
 </div>
 </body>
