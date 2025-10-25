@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, jsonify, abort, send_from_dir
 from datetime import datetime, timedelta
 import threading, itertools
 from werkzeug.security import generate_password_hash, check_password_hash
-import json, os, secrets
+import json, os, secrets, random
 
 # Flask yapılandırması
 app = Flask(
@@ -11,26 +11,24 @@ app = Flask(
     static_url_path='/static',
     template_folder='templates'
 )
-
-# ===== Basic Auth (Session) & Users DB =====
+# === Users DB & Session ===
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
 USERS_DB = os.path.join(os.path.dirname(__file__), "data", "users.json")
-
 def _load_users():
     try:
+        import json; 
         with open(USERS_DB, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {}
-
 def _save_users(users):
+    import json, os
     os.makedirs(os.path.dirname(USERS_DB), exist_ok=True)
     with open(USERS_DB, "w", encoding="utf-8") as f:
         json.dump(users, f, ensure_ascii=False, indent=2)
-
-def current_user():
+def current_user(): 
     return session.get("user")
-# ===== End Users DB =====
+# === end ===
 
 
 # ------- ICON ALIASES (PWABuilder veya Play isteği 200 dönsün) -------
@@ -250,66 +248,35 @@ def _auth_wall():
         if not current_user():
             return redirect(url_for("login"))
 
-@app.route("/auth/login", methods=["GET","POST"])
-def login():
-    if request.method == "GET":
-        return render_template("auth_login.html", error=None)
-    username = (request.form.get("username") or "").strip().lower()
-    password = request.form.get("password") or ""
-    users = _load_users()
-    u = users.get(username)
-    if not u or not check_password_hash(u["pw"], password):
-        return render_template("auth_login.html", error="Kullanıcı adı veya şifre hatalı.")
-    session["user"] = username
-    return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
-
-@app.route("/auth/register", methods=["GET","POST"])
-def register():
-    if request.method == "GET":
-        return render_template("auth_register.html", error=None)
-    username = (request.form.get("username") or "").strip().lower()
-    email = (request.form.get("email") or "").strip()
-    password = request.form.get("password") or ""
-    if not username or not password:
-        return render_template("auth_register.html", error="Kullanıcı adı ve şifre gerekli.")
-    users = _load_users()
-    if username in users:
-        return render_template("auth_register.html", error="Bu kullanıcı adı zaten kayıtlı.")
-    users[username] = {"email": email, "pw": generate_password_hash(password)}
-    _save_users(users)
-    session["user"] = username
-    return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
-
-@app.route("/auth/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
 import smtplib
 from email.message import EmailMessage
+from datetime import datetime, timedelta
 SMTP_HOST = os.environ.get("SMTP_HOST")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
 SMTP_USER = os.environ.get("SMTP_USER")
 SMTP_PASS = os.environ.get("SMTP_PASS")
 FROM_EMAIL = os.environ.get("FROM_EMAIL", SMTP_USER or "no-reply@example.com")
 
-def _send_reset_code_via_email(to_email, code):
+def _generate_4digit_code():
+    return f"{random.randint(0, 9999):04d}"
+
+def _send_email(to_email: str, subject: str, body: str) -> bool:
     if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        print("SMTP not configured; skipping send to", to_email)
+        print("[SMTP DEBUG] to:", to_email); print("[SMTP DEBUG] subject:", subject); print("[SMTP DEBUG] body:", body)
         return False
     try:
         msg = EmailMessage()
-        msg["Subject"] = "Piknik Vakti - Şifre Sıfırlama Kodu"
+        msg["Subject"] = subject
         msg["From"] = FROM_EMAIL
         msg["To"] = to_email
-        msg.set_content(f"Şifre sıfırlama kodunuz: {code}\nBu kod 15 dakika içinde geçerlidir.")
+        msg.set_content(body)
         with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
             s.starttls()
             s.login(SMTP_USER, SMTP_PASS)
             s.send_message(msg)
         return True
     except Exception as e:
-        print("Failed sending SMTP:", e)
+        print("SMTP send failed:", e)
         return False
 
 @app.route("/auth/forgot", methods=["GET","POST"])
@@ -317,35 +284,41 @@ def forgot():
     if request.method == "GET":
         return render_template("auth_forgot.html", error=None, ok=None)
     username = (request.form.get("username") or "").strip().lower()
+    code = (request.form.get("code") or "").strip()
+    new_password = request.form.get("new_password") or ""
+    login_with_code = request.form.get("login_with_code") == "1"
     users = _load_users()
     if username not in users:
         return render_template("auth_forgot.html", error="Kullanıcı bulunamadı.", ok=None)
     user = users[username]
-    code = (request.form.get("code") or "").strip()
-    new_password = request.form.get("new_password") or ""
-    # Verify path
-    if code:
-        token_info = user.get("reset_token")
-        if not token_info or token_info.get("code") != code:
-            return render_template("auth_forgot.html", error="Kod hatalı veya süresi dolmuş.", ok=None)
-        exp = datetime.fromisoformat(token_info.get("expires"))
-        if datetime.utcnow() > exp:
-            return render_template("auth_forgot.html", error="Kodun süresi dolmuş.", ok=None)
-        if not new_password:
-            return render_template("auth_forgot.html", error="Yeni şifre girin.", ok=None)
-        users[username]["pw"] = generate_password_hash(new_password)
-        users[username].pop("reset_token", None)
-        _save_users(users)
-        return render_template("auth_forgot.html", error=None, ok="Şifre güncellendi. Giriş yapabilirsiniz.")
-    # Send path
     email = user.get("email")
     if not email:
-        return render_template("auth_forgot.html", error="Kullanıcıda e-posta yok. Kayıtlı e-posta gereklidir.", ok=None)
-    gen_code = secrets.token_hex(3).upper()
-    user["reset_token"] = {"code": gen_code, "expires": (datetime.utcnow() + timedelta(minutes=15)).isoformat()}
-    _save_users(users)
-    sent = _send_reset_code_via_email(email, gen_code)
-    if sent:
-        return render_template("auth_forgot.html", error=None, ok="Kod gönderildi. E‑postanızı kontrol edin.")
-    else:
-        return render_template("auth_forgot.html", error="E‑posta gönderilemedi; SMTP yapılandırmasını kontrol edin.", ok=None)
+        return render_template("auth_forgot.html", error="Kullanıcıda kayıtlı e-posta yok.", ok=None)
+    if not code and not new_password and not login_with_code:
+        gen_code = _generate_4digit_code()
+        user["reset_token"] = {"code": gen_code, "expires": (datetime.utcnow() + timedelta(minutes=15)).isoformat(), "used": False}
+        _save_users(users)
+        sent = _send_email(email, "Piknik Vakti — Şifre Sıfırlama Kodu", f"Merhaba {username},\n\nKodunuz: {gen_code}\n15 dakika geçerlidir.")
+        if sent:
+            return render_template("auth_forgot.html", error=None, ok="Kod gönderildi. E-postanızı kontrol edin.")
+        else:
+            return render_template("auth_forgot.html", error="E-posta gönderilemedi; SMTP ayarlarını kontrol edin.", ok=None)
+    if code:
+        token = user.get("reset_token")
+        if not token or token.get("code") != code or token.get("used"):
+            return render_template("auth_forgot.html", error="Kod hatalı veya kullanılmış.", ok=None)
+        from datetime import datetime
+        exp = datetime.fromisoformat(token.get("expires"))
+        if datetime.utcnow() > exp:
+            return render_template("auth_forgot.html", error="Kodun süresi dolmuş.", ok=None)
+        if login_with_code and not new_password:
+            user["reset_token"]["used"] = True
+            _save_users(users)
+            session["user"] = username
+            return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
+        if new_password:
+            user["pw"] = generate_password_hash(new_password)
+            user.pop("reset_token", None)
+            _save_users(users)
+            return render_template("auth_forgot.html", error=None, ok="Şifre değiştirildi. Giriş yapabilirsiniz.")
+        return render_template("auth_forgot.html", error=None, ok="Kod doğrulandı; lütfen yeni şifre girin.")

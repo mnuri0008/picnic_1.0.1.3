@@ -36,29 +36,3 @@ hr.soft{border:0;height:1px;background:linear-gradient(90deg,transparent,#27415f
 .btn.state.needed.active{background:#2b1313;border-color:#6d2b2b}
 .btn.state.brought.active{background:#13301f;border-color:#2a6d45}
 .btn.state.claimed.active{background:#2a2441;border-color:#6a5de6}
-
-
-/* === Mobile Navbar Update v2 === */
-.navbar.mobile{
-  display:flex; justify-content:center; align-items:center;
-  padding:10px 0; background:#0b1422; position:sticky; top:0; z-index:999;
-  border-bottom:1px solid #1c2a40;
-}
-.navbar.mobile .brand.center{
-  display:flex; flex-direction:row; align-items:center; gap:8px;
-  font-size:20px; font-weight:700; color:#fff; text-decoration:none;
-}
-.navbar.mobile .brand.center img{ width:30px; height:30px; border-radius:6px; }
-@media (max-width:600px){
-  body{font-size:15px;}
-  .container{padding:0 10px;}
-  .card{margin:10px 0; padding:12px;}
-  .navbar.mobile .brand.center span{font-size:18px;}
-  .container.narrow{max-width:100%; padding:0 8px;}
-}
-.brand:hover{opacity:.85; transform:translateY(-1px);}
-
-
-/* Auth screens */
-.container.narrow{max-width:520px;margin:0 auto}
-.container.narrow .card{margin-top:18px}

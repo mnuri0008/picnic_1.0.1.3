@@ -13,7 +13,7 @@
     <div class="lang">
       <a href="?username={{ username }}&lang=tr{{ '&view=1' if view else '' }}" class="{{ 'active' if lang=='tr' else '' }}" data-lang="tr">🇹🇷 TR</a>
       <a href="?username={{ username }}&lang=en{{ '&view=1' if view else '' }}" class="{{ 'active' if lang=='en' else '' }}" data-lang="en">🇬🇧 EN</a>
-    </a>
+    </div>
   </div>
 
   <h1>📅 Piknik Vakti — {{ code if not view else (code[:2] + '**') }}</h1>
@@ -39,12 +39,12 @@
       <input id="amount" value="1">
       <button id="add" class="primary" {% if view %}disabled{% endif %}>Ekle</button>
     </div>
-    <div id="quick" class="quick"></a>
+    <div id="quick" class="quick"></div>
   </div>
 
   <div class="card">
     <h2>🧺 Ürünler</h2>
-    <div id="list" class="list"></a>
+    <div id="list" class="list"></div>
   </div>
 </div>
 
