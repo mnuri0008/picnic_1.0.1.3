@@ -285,7 +285,7 @@ def logout():
     session.clear()
     return redirect(url_for("login"))
 
-import smtplib, datetime
+import smtplib
 from email.message import EmailMessage
 SMTP_HOST = os.environ.get("SMTP_HOST")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
@@ -328,8 +328,8 @@ def forgot():
         token_info = user.get("reset_token")
         if not token_info or token_info.get("code") != code:
             return render_template("auth_forgot.html", error="Kod hatalı veya süresi dolmuş.", ok=None)
-        exp = datetime.datetime.fromisoformat(token_info.get("expires"))
-        if datetime.datetime.utcnow() > exp:
+        exp = datetime.fromisoformat(token_info.get("expires"))
+        if datetime.utcnow() > exp:
             return render_template("auth_forgot.html", error="Kodun süresi dolmuş.", ok=None)
         if not new_password:
             return render_template("auth_forgot.html", error="Yeni şifre girin.", ok=None)
@@ -342,7 +342,7 @@ def forgot():
     if not email:
         return render_template("auth_forgot.html", error="Kullanıcıda e-posta yok. Kayıtlı e-posta gereklidir.", ok=None)
     gen_code = secrets.token_hex(3).upper()
-    user["reset_token"] = {"code": gen_code, "expires": (datetime.datetime.utcnow() + datetime.timedelta(minutes=15)).isoformat()}
+    user["reset_token"] = {"code": gen_code, "expires": (datetime.utcnow() + timedelta(minutes=15)).isoformat()}
     _save_users(users)
     sent = _send_reset_code_via_email(email, gen_code)
     if sent:
