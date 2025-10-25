@@ -237,19 +237,23 @@ if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
 
 
+
 @app.before_request
 def _auth_wall():
     open_paths = {"icon_192","icon_512","picnic_icon_192","picnic_icon_512",
                   "manifest","service_worker","asset_links",
                   "login","register","forgot","logout"}
-    # Allow static or explicit open endpoints
+    # allow static & open endpoints
     if request.endpoint and (request.endpoint.startswith("static") or request.endpoint in open_paths):
         return
-    # Allow auth and well-known
+    # allow auth & well-known
     if request.path.startswith("/auth/") or request.path.startswith("/.well-known"):
         return
-    # Guard homepage and room pages
-    if request.path.startswith("/room") or request.path == "/":
+    # allow welcome at root
+    if request.path == "/":
+        return
+    # protect room pages and others (example kept)
+    if request.path.startswith("/room"):
         if not current_user():
             try:
                 return redirect(url_for("login"))

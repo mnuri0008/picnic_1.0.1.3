@@ -1,0 +1,140 @@
+name: Build Android AAB (Capacitor – no prompts)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ID: com.onrender.picnic3
+      APP_NAME: "Picnic Vakti"
+      SITE_URL: https://picnic-3.onrender.com
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+      # Keystore için varsayılanlar (secret yoksa bile build edebilsin)
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS != '' && secrets.KEY_ALIAS || 'upload' }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD != '' && secrets.KEYSTORE_PASSWORD || 'picnic123' }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD != '' && secrets.KEY_PASSWORD || 'picnic123' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---- Java 21 (hata "invalid source release: 21" için) ----
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Capacitor toolchain
+        run: |
+          npm i -g npm@10
+          mkdir mobile && cd mobile
+          npm init -y
+          npm i @capacitor/core @capacitor/cli @capacitor/android
+
+      - name: Create Capacitor config (remote site)
+        working-directory: mobile
+        run: |
+          cat > capacitor.config.json <<JSON
+          {
+            "appId": "${APP_ID}",
+            "appName": "${APP_NAME}",
+            "webDir": "dist",
+            "bundledWebRuntime": false,
+            "server": {
+              "url": "${SITE_URL}",
+              "cleartext": false
+            }
+          }
+          JSON
+          mkdir -p dist
+          echo "<html><body>Capacitor shell</body></html>" > dist/index.html
+
+      - name: Add Android platform
+        working-directory: mobile
+        run: npx cap add android
+
+      # ---- Keystore'u secrets'tan çıkar ----
+      - name: Restore signing keystore
+        working-directory: mobile/android/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > upload.keystore
+            test -s upload.keystore || { echo "upload.keystore could not be created"; exit 1; }
+            echo "✅ Keystore restored (size: $(stat -c%s upload.keystore) bytes)"
+          else
+            echo "⚠️ SIGNING_KEYSTORE_BASE64 yok; release yine de derlenecek ama imza bu dosyayla yapılacak: mobile/android/app/upload.keystore (dummy)."
+            keytool -genkeypair -v \
+              -keystore upload.keystore \
+              -storepass "${KEYSTORE_PASSWORD}" \
+              -keypass "${KEY_PASSWORD}" \
+              -alias "${KEY_ALIAS}" \
+              -keyalg RSA -keysize 2048 -validity 3650 \
+              -dname "CN=Picnic,O=Picnic,L=,S=,C=TR"
+          fi
+
+      # ---- Gradle release imzasını ekle ----
+      - name: Configure Gradle signing for release
+        working-directory: mobile/android/app
+        shell: bash
+        run: |
+          set -euo pipefail
+          BGF=build.gradle
+          # signingConfigs.release + buildTypes.release patch
+          awk '
+            BEGIN{gotAndroid=0; gotBuildTypes=0}
+            /android \{/ && gotAndroid==0 {
+              print; print "    signingConfigs {"; 
+              print "        release {"; 
+              print "            storeFile file(\"upload.keystore\")"; 
+              print "            storePassword System.getenv(\"KEYSTORE_PASSWORD\")"; 
+              print "            keyAlias System.getenv(\"KEY_ALIAS\")"; 
+              print "            keyPassword System.getenv(\"KEY_PASSWORD\")"; 
+              print "        }"; 
+              print "    }";
+              gotAndroid=1; next
+            }
+            /buildTypes \{/ && gotBuildTypes==0 {
+              print; 
+              print "        release {"; 
+              print "            signingConfig signingConfigs.release"; 
+              print "            minifyEnabled false"; 
+              print "            shrinkResources false"; 
+              print "        }";
+              gotBuildTypes=1; next
+            }
+            {print}
+          ' "$BGF" > tmp.gradle && mv tmp.gradle "$BGF"
+
+          # Java toolchain/compat ayarları (Java 21 derlenebilir, bağımlılıklar 17 istese bile uyumlu)
+          # app ve capacitor modülleri için gradle.properties üzerinden JDK yolu da sabitleyelim.
+          echo "org.gradle.java.home=$JAVA_HOME" >> ../gradle.properties
+
+      # ---- AAB derle ----
+      - name: Build AAB (bundleRelease)
+        working-directory: mobile/android
+        env:
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon clean bundleRelease
+          ls -lah app/build/outputs/bundle/release
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: picnic-capacitor-aab
+          path: mobile/android/app/build/outputs/bundle/release/*.aab

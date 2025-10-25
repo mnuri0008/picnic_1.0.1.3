@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.picnic-3.onrender",
+        "sha256_cert_fingerprints": ["D8:12:46:65:8C:0F:C4:6A:F8:56:98:5F:ED:A3:08:B3:A0:7C:E3:43:3D:7D:A6:23:35:D9:EF:BB:B2:68:DC:25"]
+      }
+    }]

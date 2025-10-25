@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Şifremi Unuttum — Piknik Vakti</title><link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body><div class="container narrow">
+  <div class="navbar navbar mobile">
+    <a href="/" class="brand center">
+      <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon"><span>Piknik Vakti</span>
+    </a>
+  </div>
+  <div class="card">
+    <h1 style="margin:0 0 6px">Şifremi Unuttum</h1>
+    <p class="small">Kullanıcı adını yaz; e‑postana 4 haneli kod gelsin. Kodla giriş yapabilir ya da yeni şifre belirleyebilirsin.</p>
+    {% if error %}<div class="small" style="color:#ffb4b4;margin-bottom:8px">{{ error }}</div>{% endif %}
+    {% if ok %}<div class="small" style="color:#b5ffb5;margin-bottom:8px">{{ ok }}</div>{% endif %}
+    <form method="post" action="/auth/forgot">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input type="text" name="username" placeholder="Kullanıcı adı" required>
+        <input type="text" name="code" placeholder="4 haneli kod (opsiyonel)">
+        <input type="password" name="new_password" placeholder="Yeni şifre (opsiyonel)">
+        <label class="small"><input type="checkbox" name="login_with_code" value="1"> Kodu kullanarak hemen giriş yap</label>
+        <button class="button primary" type="submit">Gönder / Doğrula</button>
+      </div>
+    </form>
+    <div style="margin-top:10px"><a class="small" href="/auth/login">Giriş sayfasına dön</a></div>
+  </div>
+</div></body></html>

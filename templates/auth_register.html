@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kayıt — Piknik Vakti</title><link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}"></head>
+<body><div class="container narrow">
+  <div class="navbar navbar mobile">
+    <a href="/" class="brand center">
+      <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon"><span>Piknik Vakti</span>
+    </a>
+  </div>
+  <div class="card">
+    <h1 style="margin:0 0 6px">Yeni Kullanıcı</h1>
+    {% if error %}<div class="small" style="color:#ffb4b4;margin-bottom:8px">{{ error }}</div>{% endif %}
+    <form method="post" action="/auth/register">
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <input type="text" name="username" placeholder="Kullanıcı adı" required>
+        <input type="email" name="email" placeholder="E‑posta" required>
+        <input type="password" name="password" placeholder="Şifre" required>
+        <button class="button primary" type="submit">Hesap Oluştur</button>
+      </div>
+    </form>
+  </div>
+</div></body></html>
