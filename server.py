@@ -246,7 +246,10 @@ def _auth_wall():
         return
     if request.path.startswith("/room") or request.path == "/":
         if not current_user():
-            return redirect(url_for("login"))
+            try:
+            return redirect(url_for('login'))
+        except Exception:
+            return redirect('/auth/login')
 
 import smtplib
 from email.message import EmailMessage
@@ -322,3 +325,21 @@ def forgot():
             _save_users(users)
             return render_template("auth_forgot.html", error=None, ok="Şifre değiştirildi. Giriş yapabilirsiniz.")
         return render_template("auth_forgot.html", error=None, ok="Kod doğrulandı; lütfen yeni şifre girin.")
+
+@app.route("/auth/login", methods=["GET","POST"])
+def login():
+    if request.method == "GET":
+        return render_template("auth_login.html", error=None)
+    username = (request.form.get("username") or "").strip().lower()
+    password = request.form.get("password") or ""
+    users = _load_users()
+    u = users.get(username)
+    if not u or not check_password_hash(u.get("pw",""), password):
+        return render_template("auth_login.html", error="Kullanıcı adı veya şifre hatalı.")
+    session["user"] = username
+    return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
+
+@app.route("/auth/logout")
+def logout():
+    session.clear()
+    return redirect("/auth/login")
