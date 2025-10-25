@@ -8,12 +8,13 @@
 </head>
 <body>
 <div class="container narrow">
-  <div class="navbar">
-    <div class="brand">
-      <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon">
-      <span>Piknik Vakti</span>
-    </div>
-  </div>
+  <div class="navbar mobile">
+  <a href="/" class="brand center">
+    <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon">
+    <span>Piknik Vakti</span>
+  </a>
+</div>
+</div>
   <div class="card">
     <h1 style="margin:0 0 6px">Giriş Yap</h1>
     <p class="small">Hesabın yok mu? <a href="/auth/register">Yeni kullanıcı oluştur</a></p>
@@ -27,7 +28,7 @@
     </form>
     <div style="margin-top:10px">
       <a class="small" href="/auth/forgot">Şifremi unuttum</a>
-    </div>
+    </a>
   </div>
 </div>
 </body>

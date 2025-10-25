@@ -94,3 +94,79 @@ input:focus{border-color:#6a8cff; box-shadow:0 0 0 2px rgba(106,140,255,.15)}
 /* Auth screens */
 .container.narrow{max-width:520px;margin:0 auto}
 .container.narrow .card{margin-top:18px}
+
+
+/* === Mobile Navbar Update (v2) === */
+.navbar.mobile{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:10px 0;
+  background:#0b1422;
+  position:sticky;
+  top:0;
+  z-index:999;
+  border-bottom:1px solid #1c2a40;
+}
+.navbar.mobile .brand.center{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:8px;
+  font-size:20px;
+  font-weight:700;
+  color:#fff;
+  text-decoration:none;
+}
+.navbar.mobile .brand.center:hover{opacity:.85; transform:translateY(-1px);}
+.navbar.mobile .brand.center img{
+  width:30px;
+  height:30px;
+  border-radius:6px;
+}
+
+@media (max-width:600px){
+  body{font-size:15px;}
+  .container{padding:0 10px; max-width:600px; margin:0 auto;}
+  .card{margin:10px 0; padding:12px;}
+  .navbar.mobile .brand.center span{font-size:18px;}
+}
+
+
+
+/* === Mobile Navbar Update v2 === */
+.navbar.mobile{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding:10px 0;
+  background:#0b1422;
+  position:sticky;
+  top:0;
+  z-index:999;
+  border-bottom:1px solid #1c2a40;
+}
+
+.navbar.mobile .brand.center{
+  display:flex;
+  flex-direction:row;
+  align-items:center;
+  gap:8px;
+  font-size:20px;
+  font-weight:700;
+  color:#fff;
+  text-decoration:none;
+}
+.navbar.mobile .brand.center img{
+  width:30px;
+  height:30px;
+  border-radius:6px;
+}
+
+@media (max-width:600px){
+  body{font-size:15px;}
+  .container{padding:0 10px;}
+  .card{margin:10px 0;padding:12px;}
+  .navbar.mobile .brand.center span{font-size:18px;}
+  .container.narrow{max-width:100%;padding:0 8px;}
+}
