@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, abort, send_from_directory, make_response, redirect, url_for, session
+from flask import Flask, render_template, request, jsonify, abort, send_from_directory, make_response
 from datetime import datetime, timedelta
 import threading, itertools
 
@@ -10,21 +10,104 @@ app = Flask(
     template_folder='templates'
 )
 
-# Session secret (demo):
-app.secret_key = 'picnic-demo-secret-key'
+# ===== Basic Auth (Session) =====
+from flask import session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+import json, os
+
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-me")
+USERS_DB = os.path.join(os.path.dirname(__file__), "data", "users.json")
+
+def _load_users():
+    try:
+        with open(USERS_DB, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _save_users(users):
+    os.makedirs(os.path.dirname(USERS_DB), exist_ok=True)
+    with open(USERS_DB, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+def current_user():
+    return session.get("user")
+
+# Login wall for main screens
+@app.before_request
+def _auth_wall():
+    open_paths = {
+        "icon_192","icon_512","picnic_icon_192","picnic_icon_512",
+        "manifest","service_worker","asset_links",
+        "login","register","forgot","do_login","do_register","do_forgot"
+    }
+    # allow static and api endpoints that might be used pre-login for health
+    if request.endpoint and (request.endpoint.startswith("static") or request.endpoint in open_paths):
+        return
+    # allow API for now; to hard-lock add: if request.path.startswith("/api/"): ...
+    if request.path.startswith("/auth/"):
+        return
+    if request.path.startswith("/.well-known"):
+        return
+    # wall only for index and room
+    if request.path.startswith("/room") or request.path == "/":
+        if not current_user():
+            return redirect(url_for("login"))
+
+# Auth routes
+@app.route("/auth/login", methods=["GET","POST"])
+def login():
+    if request.method == "GET":
+        return render_template("auth_login.html", error=None)
+    data = request.form
+    username = (data.get("username") or "").strip().lower()
+    password = data.get("password") or ""
+    users = _load_users()
+    u = users.get(username)
+    if not u or not check_password_hash(u["pw"], password):
+        return render_template("auth_login.html", error="Kullanıcı adı veya şifre hatalı.")
+    session["user"] = username
+    return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
+
+@app.route("/auth/register", methods=["GET","POST"])
+def register():
+    if request.method == "GET":
+        return render_template("auth_register.html", error=None)
+    data = request.form
+    username = (data.get("username") or "").strip().lower()
+    email = (data.get("email") or "").strip()
+    password = data.get("password") or ""
+    if not username or not password:
+        return render_template("auth_register.html", error="Kullanıcı adı ve şifre gerekli.")
+    users = _load_users()
+    if username in users:
+        return render_template("auth_register.html", error="Bu kullanıcı adı zaten kayıtlı.")
+    users[username] = {"email": email, "pw": generate_password_hash(password)}
+    _save_users(users)
+    session["user"] = username
+    return redirect(url_for("index")) if "index" in app.view_functions else redirect("/")
+
+@app.route("/auth/forgot", methods=["GET","POST"])
+def forgot():
+    if request.method == "GET":
+        return render_template("auth_forgot.html", error=None, ok=None)
+    data = request.form
+    username = (data.get("username") or "").strip().lower()
+    new_password = data.get("new_password") or ""
+    users = _load_users()
+    if username not in users:
+        return render_template("auth_forgot.html", error="Kullanıcı bulunamadı.", ok=None)
+    users[username]["pw"] = generate_password_hash(new_password)
+    _save_users(users)
+    return render_template("auth_forgot.html", error=None, ok="Şifre güncellendi, giriş yapabilirsiniz.")
+
+@app.route("/auth/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+# ===== End Basic Auth =====
 
 
-# Basit kullanıcı deposu (in-memory, sınırsız kullanıcı)
-USERS = {}  # username -> {"password":"...", "color":"...", "secret_q":"...", "secret_a":"..."}
-
-def login_required(fn):
-    from functools import wraps
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get("username"):
-            return redirect(url_for("login_page", next=request.path, lang=request.args.get("lang","tr")))
-        return fn(*args, **kwargs)
-    return wrapper
 # ------- ICON ALIASES (PWABuilder veya Play isteği 200 dönsün) -------
 @app.route("/static/icons/icon-192.png")
 def icon_192():
@@ -89,19 +172,42 @@ def _as_dt(s: str):
 
 # ---------- SAYFALAR ----------
 @app.route("/")
-@login_required
 def home():
-    lang = request.args.get("lang", session.get("lang","tr"))
-    username = session.get("username","")
-    # Eski index.html aynı kalsın diye querystring ile de username/lang geçelim
-    return redirect(url_for("index_page", username=username, lang=lang))
+    lang = request.args.get("lang", "tr")
+    now = datetime.utcnow()
+
+    with LOCK:
+        to_delete = []
+        for code, r in list(ROOMS.items()):
+            d = _as_dt(r.get("date") or "")
+            if d and now > d + timedelta(days=10):
+                to_delete.append(code)
+        for c in to_delete:
+            ROOMS.pop(c, None)
+
+        rooms = []
+        for code, r in ROOMS.items():
+            d_str = r.get("date") or ""
+            d_dt = _as_dt(d_str) or datetime.min
+            rooms.append({
+                "code": code,
+                "date": d_str,
+                "items": len(r.get("items", [])),
+                "mask": mask(code),
+                "_sort": d_dt
+            })
+
+    rooms.sort(key=lambda x: x["_sort"], reverse=True)
+    for r in rooms:
+        r.pop("_sort", None)
+
+    return render_template("index.html", rooms=rooms, lang=lang)
 
 
 @app.route("/room/<code>")
-@login_required
 def room(code):
-    username = session.get('username') or request.args.get('username','')
-    lang = request.args.get('lang', session.get('lang','tr'))
+    username = request.args.get("username", "guest")
+    lang = request.args.get("lang", "tr")
     view = request.args.get("view") == "1"
     return render_template("room.html", code=code, username=username, lang=lang, view=view)
 
@@ -202,97 +308,6 @@ def api_del_item(code, item_id):
                 return "", 204
     abort(404)
 
-
-
-# ------- Basit arayüz rotaları (3 arayüz) -------
-# ------- Auth endpoints -------
-@app.route("/login", methods=["GET"])
-def login_page():
-    lang = request.args.get("lang", session.get("lang","tr"))
-    return render_template("login.html", lang=lang)
-
-@app.post("/auth/login")
-def auth_login():
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip()
-    password = (data.get("password") or "").strip()
-    lang = (data.get("lang") or request.args.get("lang") or "tr").strip()
-    if not username or not password:
-        abort(400, description="missing credentials")
-    # kabul: kullanıcı yoksa demo amaçlı otomatik oluşturma yerine kayıt şartı
-    user = USERS.get(username)
-    if not user or user.get("password") != password:
-        abort(401, description="bad credentials")
-    session["username"] = username
-    session["lang"] = lang
-    return jsonify(ok=True)
-
-@app.post("/auth/register")
-def auth_register():
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip()
-    password = (data.get("password") or "").strip()
-    color    = (data.get("color") or "").strip()
-    secret_q = (data.get("secret_q") or "").strip()
-    secret_a = (data.get("secret_a") or "").strip()
-    lang = (data.get("lang") or request.args.get("lang") or "tr").strip()
-    if not username or not password or not color or not secret_q or not secret_a:
-        abort(400, description="missing fields")
-    if username in USERS:
-        abort(409, description="user exists")
-    USERS[username] = {"password": password, "color": color, "secret_q": secret_q, "secret_a": secret_a}
-    return jsonify(ok=True)
-
-@app.post("/auth/forgot")
-def auth_forgot():
-    data = request.get_json(silent=True) or request.form
-    username = (data.get("username") or "").strip()
-    answer   = (data.get("secret_a") or "").strip()
-    if not username or username not in USERS:
-        abort(404, description="user not found")
-    if not answer or answer.lower().strip() != USERS[username].get("secret_a","").lower().strip():
-        abort(403, description="wrong answer")
-    USERS[username]["password"] = "1234"
-    return jsonify(ok=True, temp_password="1234")
-
-@app.get("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login_page"))
-
-
-@app.route("/register")
-def register_page():
-    # İkinci arayüz: mevcut index/oda mantığıyla çalışacak bir kayıt formu iskeleti
-    return render_template("index.html")
-
-@app.route("/forgot")
-def forgot_page():
-    # Üçüncü arayüz: şifre sıfırlama iskeleti (mevcut arayüz değişmeden)
-    return render_template("index.html")
-
-
-
-def list_rooms():
-    with LOCK:
-        data = []
-        for code, r in ROOMS.items():
-            data.append({
-                "code": code,
-                "owner": r.get("owner",""),
-                "date": r.get("date",""),
-                "count": len(r.get("items", []))
-            })
-        # Son eklenenler önce görünsün
-        data.sort(key=lambda x: x.get("date",""), reverse=True)
-        return data
-
-@app.route("/home")
-def index_page():
-    # Eski index.html'i aynen render edelim
-    lang = request.args.get("lang", session.get("lang","tr"))
-    username = request.args.get("username", session.get("username",""))
-    return render_template("index.html", rooms=list_rooms(), lang=lang, username=username)
 
 # ------- Ana çalıştırma -------
 if __name__ == "__main__":

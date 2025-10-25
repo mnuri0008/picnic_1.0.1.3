@@ -36,3 +36,61 @@ hr.soft{border:0;height:1px;background:linear-gradient(90deg,transparent,#27415f
 .btn.state.needed.active{background:#2b1313;border-color:#6d2b2b}
 .btn.state.brought.active{background:#13301f;border-color:#2a6d45}
 .btn.state.claimed.active{background:#2a2441;border-color:#6a5de6}
+
+
+
+/* === UI Update v1 (Burak) === */
+:root{
+  --shadow: 0 10px 25px rgba(0,0,0,.35);
+}
+
+.navbar{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; margin:-10px -12px 10px;
+  background: rgba(5,12,22,.85);
+  backdrop-filter: blur(8px);
+  border-bottom:1px solid #1c2a40;
+}
+
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+.brand img{width:28px;height:28px;border-radius:8px}
+
+.badge{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #22344f;border-radius:999px;color:#b9d1ff;background:#0b1422}
+
+.card{background:linear-gradient(180deg,#0f1724,#0a111c); border:1px solid #1e2b41; border-radius:16px; padding:14px; box-shadow:var(--shadow)}
+
+input[type="text"], input[type="datetime-local"], select{
+  height:40px; border-radius:12px; border:1px solid #29405f; background:#0b1422; color:#e5efff;
+  padding:0 12px; outline:none
+}
+input::placeholder{color:#7f9bbb}
+input:focus{border-color:#6a8cff; box-shadow:0 0 0 2px rgba(106,140,255,.15)}
+
+.button{
+  height:40px; padding:0 16px; border-radius:12px; border:1px solid #415b82; background:#102236; color:#e8f0ff;
+  font-weight:600; cursor:pointer;
+}
+.button:hover{transform: translateY(-1px)}
+.button.primary{background:linear-gradient(180deg,#274b88,#1d2e6d); border-color:#2f4a9a}
+
+.section-title{font-size:14px; color:#8aa3c6; font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin:6px 0 10px}
+
+.footer{margin-top:24px; padding-top:10px; border-top:1px dashed #23334a; color:#8aa3c6; font-size:12px; opacity:.8}
+
+.item{transition:transform .15s ease, box-shadow .15s ease}
+.item:hover{transform: translateY(-1px); box-shadow: 0 8px 18px rgba(0,0,0,.35)}
+
+.toggle{display:inline-flex; gap:6px; align-items:center; cursor:pointer}
+.toggle input{appearance:none; width:42px; height:24px; border-radius:999px; background:#1c2a33; position:relative; outline:none; border:1px solid #2b415e}
+.toggle input::after{content:""; position:absolute; top:2px; left:2px; width:20px; height:20px; background:#bcd6ff; border-radius:50%; transition:left .2s}
+.toggle input:checked{background:#33446b}
+.toggle input:checked::after{left:20px}
+
+.small{font-size:12px;color:#8aa3c6}
+
+
+
+/* Auth screens */
+.container.narrow{max-width:520px;margin:0 auto}
+.container.narrow .card{margin-top:18px}
