@@ -236,51 +236,25 @@ def api_del_item(code, item_id):
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
 
+
 @app.before_request
 def _auth_wall():
-    open_paths = {"icon_192","icon_512","picnic_icon_192","picnic_icon_512","manifest","service_worker","asset_links",
+    open_paths = {"icon_192","icon_512","picnic_icon_192","picnic_icon_512",
+                  "manifest","service_worker","asset_links",
                   "login","register","forgot","logout"}
+    # Allow static or explicit open endpoints
     if request.endpoint and (request.endpoint.startswith("static") or request.endpoint in open_paths):
         return
+    # Allow auth and well-known
     if request.path.startswith("/auth/") or request.path.startswith("/.well-known"):
         return
+    # Guard homepage and room pages
     if request.path.startswith("/room") or request.path == "/":
         if not current_user():
             try:
-            return redirect(url_for('login'))
-        except Exception:
-            return redirect('/auth/login')
-
-import smtplib
-from email.message import EmailMessage
-from datetime import datetime, timedelta
-SMTP_HOST = os.environ.get("SMTP_HOST")
-SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
-SMTP_USER = os.environ.get("SMTP_USER")
-SMTP_PASS = os.environ.get("SMTP_PASS")
-FROM_EMAIL = os.environ.get("FROM_EMAIL", SMTP_USER or "no-reply@example.com")
-
-def _generate_4digit_code():
-    return f"{random.randint(0, 9999):04d}"
-
-def _send_email(to_email: str, subject: str, body: str) -> bool:
-    if not SMTP_HOST or not SMTP_USER or not SMTP_PASS:
-        print("[SMTP DEBUG] to:", to_email); print("[SMTP DEBUG] subject:", subject); print("[SMTP DEBUG] body:", body)
-        return False
-    try:
-        msg = EmailMessage()
-        msg["Subject"] = subject
-        msg["From"] = FROM_EMAIL
-        msg["To"] = to_email
-        msg.set_content(body)
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as s:
-            s.starttls()
-            s.login(SMTP_USER, SMTP_PASS)
-            s.send_message(msg)
-        return True
-    except Exception as e:
-        print("SMTP send failed:", e)
-        return False
+                return redirect(url_for("login"))
+            except Exception:
+                return redirect("/auth/login")
 
 @app.route("/auth/forgot", methods=["GET","POST"])
 def forgot():
