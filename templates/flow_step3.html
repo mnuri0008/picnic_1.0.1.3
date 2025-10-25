@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Adım 3 — Piknik Vakti</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <div class="navbar navbar mobile">
+    <a href="/" class="brand center">
+      <img src="{{ url_for('static', filename='icons/picnic-icon-192.png') }}" alt="icon"><span>Piknik Vakti</span>
+    </a>
+  </div>
+  <div class="container">
+    <div class="card">
+      <h1>Adım 3</h1>
+      <p class="small">Buraya 3. ekran içeriğini koyacağız. Bu adımdan sonra uygulamanın ana sayfalarına yönlendireceğiz.</p>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <a class="button" href="/flow/step2">← Geri</a>
+        <a class="button primary" href="/room">Uygulamaya Geç →</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
