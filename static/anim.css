@@ -1,0 +1,29 @@
+
+/* Piknik Vakti — Animated Icon Pack (CSS-only) */
+:root {
+  --chip-radius: 22px;
+  --chip-bg: rgba(255,255,255,.04);
+  --chip-bg-hover: rgba(255,255,255,.07);
+  --chip-border: rgba(255,255,255,.10);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: .55rem;
+  padding: .5rem .8rem; border-radius: var(--chip-radius);
+  border: 1px solid var(--chip-border); background: var(--chip-bg);
+  transition: transform .14s ease, box-shadow .2s ease, background-color .2s ease, border-color .2s ease;
+  will-change: transform; cursor: pointer; user-select: none;
+}
+.chip:hover, .chip:focus-visible, .chip.is-tap {
+  background: var(--chip-bg-hover);
+  transform: translateY(-1px) scale(1.035);
+  box-shadow: 0 6px 14px rgba(0,0,0,.18);
+  border-color: rgba(255,255,255,.18);
+}
+.chip .icon { display:inline-block; font-size:1rem; line-height:1; transform-origin:60% 60%; transition: transform .2s ease; }
+.chip:hover .icon, .chip.is-tap .icon { animation: wiggle .45s ease both; }
+@keyframes wiggle{0%{transform:rotate(0)}30%{transform:rotate(-8deg)}60%{transform:rotate(6deg)}100%{transform:rotate(0)}}
+.chip.is-breathing{animation:breath 8s ease-in-out infinite}
+@keyframes breath{0%,100%{transform:none}50%{transform:translateY(-1px) scale(1.02)}}
+.chip.is-highlight{animation:glow 1.8s ease-in-out infinite}
+@keyframes glow{0%,100%{box-shadow:0 0 0 rgba(0,0,0,0)}50%{box-shadow:0 0 0 6px rgba(0,200,120,.15)}}
+@media (prefers-reduced-motion: reduce){.chip, .chip *{animation:none!important;transition:none!important}}
