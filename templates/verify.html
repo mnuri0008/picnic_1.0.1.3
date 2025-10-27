@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ t('reset_pass') }}</h1>
+<form method="post" action="{{ url_for('verify_otp_post', lang=lang) }}" class="card">
+  <label>{{ t('email') }}</label>
+  <input name="email" type="email" value="{{ email }}" required>
+  <label>{{ t('otp_code') }}</label>
+  <input name="code" inputmode="numeric" pattern="\d{4}" maxlength="4" required>
+  <label>{{ t('password') }}</label>
+  <input name="new_password" type="password" minlength="6" required>
+  <button type="submit">{{ t('reset_pass') }}</button>
+</form>
+{% endblock %}

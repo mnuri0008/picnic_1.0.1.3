@@ -1,0 +1,3 @@
+- Start: `gunicorn server:app`
+- Set SMTP_* env vars to actually send OTP emails.
+- Sessions/rooms expire after 10 days. Use `python cleanup.py` periodically.

@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ t('login_title') }}</h1>
+<form method="post" action="{{ url_for('login_post', lang=lang) }}" class="card">
+  <label>{{ t('email') }}</label>
+  <input name="email" type="email" required>
+  <label>{{ t('password') }}</label>
+  <input name="password" type="password" required minlength="6">
+  <button type="submit">{{ t('login') }}</button>
+</form>
+<div class="row">
+  <a class="btn ghost" href="{{ url_for('register', lang=lang) }}">{{ t('register') }}</a>
+  <a class="btn ghost" href="{{ url_for('forgot', lang=lang) }}">{{ t('forgot') }}</a>
+</div>
+{% endblock %}

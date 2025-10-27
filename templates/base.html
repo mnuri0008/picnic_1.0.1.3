@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="{{ 'tr' if lang=='tr' else 'en' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ t('home_title') }}</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='anim.css') }}">
+  <script defer src="{{ url_for('static', filename='anim.js') }}"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🥗 Piknik Vakti</div>
+  <nav class="right">
+    <a class="lang" href="{{ tr_link }}">TR</a>
+    <a class="lang" href="{{ en_link }}">EN</a>
+  </nav>
+</header>
+<main class="container">
+  {% with messages = get_flashed_messages() %}
+  {% if messages %}
+  <div class="flash">{% for m in messages %}<div>{{ m }}</div>{% endfor %}</div>
+  {% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

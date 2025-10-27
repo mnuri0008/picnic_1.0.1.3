@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ t('register') }}</h1>
+<form method="post" action="{{ url_for('register_post', lang=lang) }}" class="card">
+  <label>{{ t('username') }}</label>
+  <input name="username" required>
+  <label>{{ t('email') }}</label>
+  <input name="email" type="email" required>
+  <label>{{ t('password') }}</label>
+  <input name="password" type="password" required minlength="6">
+  <button type="submit">{{ t('register') }}</button>
+</form>
+{% endblock %}

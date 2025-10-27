@@ -1,216 +1,213 @@
-from flask import Flask, render_template, request, jsonify, abort, send_from_directory, make_response
-from datetime import datetime, timedelta
-import threading, itertools
+import os, secrets, smtplib, ssl
+from datetime import datetime
+from email.message import EmailMessage
+from hashlib import sha256
+from flask import Flask, request, redirect, make_response, render_template, jsonify, url_for, abort, flash
+from models import init_db, SessionLocal, User, Session, OTP, Room, Item
+from sqlalchemy.exc import IntegrityError
+from email_validator import validate_email, EmailNotValidError
 
-# Flask yapılandırması
-app = Flask(
-    __name__,
-    static_folder='static',
-    static_url_path='/static',
-    template_folder='templates'
-)
+app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret")
 
-# ------- ICON ALIASES (PWABuilder veya Play isteği 200 dönsün) -------
-@app.route("/static/icons/icon-192.png")
-def icon_192():
-    return send_from_directory("static/icons", "icon-192.png", mimetype="image/png")
+init_db()
 
-@app.route("/static/icons/icon-512.png")
-def icon_512():
-    return send_from_directory("static/icons", "icon-512.png", mimetype="image/png")
+def now(): return datetime.utcnow()
+def hash_pw(p): return sha256((p + os.environ.get("PW_SALT","salt")).encode()).hexdigest()
+def gen_token(): return secrets.token_urlsafe(32)
+def get_lang(): return request.args.get("lang") or request.cookies.get("lang") or "tr"
 
-@app.route("/static/icons/picnic-icon-192.png")
-def picnic_icon_192():
-    return send_from_directory("static/icons", "icon-192.png", mimetype="image/png")
+def t(key):
+    lang = get_lang()
+    TR = {"login_title":"Giriş Yap","email":"E-Posta","password":"Şifre","login":"Giriş",
+          "register":"Kayıt Ol","forgot":"Şifremi Unuttum","logout":"Çıkış","send_code":"Kod Gönder",
+          "reset_pass":"Şifreyi Sıfırla","otp_code":"Doğrulama Kodu","username":"Kullanıcı Adı",
+          "home_title":"Piknik Vakti"}
+    EN = {"login_title":"Sign In","email":"Email","password":"Password","login":"Login",
+          "register":"Sign Up","forgot":"Forgot Password","logout":"Logout","send_code":"Send Code",
+          "reset_pass":"Reset Password","otp_code":"OTP Code","username":"Username",
+          "home_title":"Picnic Time"}
+    return (TR if lang=='tr' else EN).get(key,key)
 
-@app.route("/static/icons/picnic-icon-512.png")
-def picnic_icon_512():
-    return send_from_directory("static/icons", "icon-512.png", mimetype="image/png")
+def template_links():
+    ep = request.endpoint or "home"
+    args = dict(request.view_args or {})
+    args.update(request.args.to_dict(flat=True))
+    args.pop("lang", None)
+    tr_link = url_for(ep, **args, lang="tr")
+    en_link = url_for(ep, **args, lang="en")
+    return tr_link, en_link
 
-# ------- PWA DOSYALARI (manifest + service worker) -------
-@app.route('/manifest.json')
-def manifest():
-    resp = make_response(send_from_directory('static', 'manifest.json'))
-    resp.mimetype = 'application/manifest+json'
-    resp.headers['Cache-Control'] = 'no-store, max-age=0'
-    return resp
+def current_user():
+    token = request.cookies.get("session")
+    if not token: return None
+    db = SessionLocal()
+    sess = db.query(Session).filter(Session.token==token, Session.expires_at > now()).first()
+    if not sess: 
+        db.close(); return None
+    user = db.query(User).get(sess.user_id)
+    db.close()
+    return user
 
-@app.route('/service-worker.js')
-def service_worker():
-    resp = make_response(send_from_directory(app.static_folder, 'service-worker.js'))
-    resp.mimetype = 'application/javascript'
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    return resp
+def send_email(to_email, subject, body):
+    smtp_host = os.environ.get("SMTP_HOST")
+    smtp_port = int(os.environ.get("SMTP_PORT","587"))
+    smtp_user = os.environ.get("SMTP_USER")
+    smtp_pass = os.environ.get("SMTP_PASS")
+    if not all([smtp_host,smtp_user,smtp_pass]):
+        app.logger.warning("SMTP creds missing; email printed to logs.")
+        app.logger.info(f"TO:{to_email}\nSUBJECT:{subject}\n{body}")
+        return False
+    msg = EmailMessage()
+    msg["From"] = smtp_user; msg["To"] = to_email; msg["Subject"] = subject
+    msg.set_content(body)
+    context = ssl.create_default_context()
+    with smtplib.SMTP(smtp_host, smtp_port) as s:
+        s.starttls(context=context); s.login(smtp_user, smtp_pass); s.send_message(msg)
+    return True
 
-# ------- Digital Asset Links (TWA doğrulaması) -------
-@app.route('/.well-known/assetlinks.json')
-def assetlinks():
-    return send_from_directory('static/.well-known', 'assetlinks.json', mimetype='application/json')
-
-
-# -------------------- APP LOGIC --------------------
-ROOMS = {}  # code -> {"owner": str, "date": str(ISO minutes), "items":[{...}]}
-IDGEN = itertools.count(1)
-LOCK = threading.Lock()
-
-def mask(code: str) -> str:
-    code = str(code or "")
-    return f"{code[:2]}**" if len(code) >= 2 else (code + "*")
-
-def now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="minutes")
-
-def _as_dt(s: str):
-    if not s:
-        return None
-    try:
-        return datetime.fromisoformat(s.replace('Z', '')).replace(second=0, microsecond=0)
-    except Exception:
-        try:
-            return datetime.strptime(s, "%Y-%m-%d %H:%M")
-        except Exception:
-            return None
-
-
-# ---------- SAYFALAR ----------
-@app.route("/")
+@app.get("/")
 def home():
-    lang = request.args.get("lang", "tr")
-    now = datetime.utcnow()
+    user = current_user()
+    if not user: return redirect(url_for("login", lang=get_lang()))
+    tr_link, en_link = template_links()
+    resp = make_response(render_template("index.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link, user=user))
+    resp.set_cookie("lang", get_lang(), max_age=31536000)
+    return resp
 
-    with LOCK:
-        to_delete = []
-        for code, r in list(ROOMS.items()):
-            d = _as_dt(r.get("date") or "")
-            if d and now > d + timedelta(days=10):
-                to_delete.append(code)
-        for c in to_delete:
-            ROOMS.pop(c, None)
+@app.get("/auth/login")
+def login():
+    tr_link, en_link = template_links()
+    return render_template("login.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link)
 
-        rooms = []
-        for code, r in ROOMS.items():
-            d_str = r.get("date") or ""
-            d_dt = _as_dt(d_str) or datetime.min
-            rooms.append({
-                "code": code,
-                "date": d_str,
-                "items": len(r.get("items", [])),
-                "mask": mask(code),
-                "_sort": d_dt
-            })
+@app.post("/auth/login")
+def login_post():
+    email = (request.form.get("email") or "").strip().lower()
+    pw = request.form.get("password") or ""
+    try:
+        validate_email(email)
+    except EmailNotValidError:
+        flash("Geçerli bir e-posta girin."); return redirect(url_for("login", lang=get_lang()))
+    db = SessionLocal()
+    user = db.query(User).filter(User.email==email).first()
+    if not user or user.password_hash != hash_pw(pw):
+        db.close(); flash("E-posta veya şifre hatalı."); return redirect(url_for("login", lang=get_lang()))
+    token = gen_token(); sess = Session(user_id=user.id, token=token)
+    db.add(sess); db.commit(); db.close()
+    resp = make_response(redirect(url_for("home", lang=get_lang())))
+    resp.set_cookie("session", token, max_age=864000, httponly=True, samesite="Lax")
+    return resp
 
-    rooms.sort(key=lambda x: x["_sort"], reverse=True)
-    for r in rooms:
-        r.pop("_sort", None)
+@app.get("/auth/register")
+def register():
+    tr_link, en_link = template_links()
+    return render_template("register.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link)
 
-    return render_template("index.html", rooms=rooms, lang=lang)
+@app.post("/auth/register")
+def register_post():
+    email = (request.form.get("email") or "").strip().lower()
+    username = (request.form.get("username") or "").strip()
+    pw = request.form.get("password") or ""
+    try:
+        validate_email(email)
+    except EmailNotValidError:
+        flash("Geçerli bir e-posta girin."); return redirect(url_for("register", lang=get_lang()))
+    if len(pw) < 6: flash("Şifre en az 6 karakter."); return redirect(url_for("register", lang=get_lang()))
+    db = SessionLocal()
+    try:
+        u = User(email=email, username=username, password_hash=hash_pw(pw))
+        db.add(u); db.commit()
+    except IntegrityError:
+        db.rollback(); db.close(); flash("Bu e-posta kayıtlı."); return redirect(url_for("register", lang=get_lang()))
+    db.close(); flash("Kayıt başarılı."); return redirect(url_for("login", lang=get_lang()))
 
+@app.get("/auth/forgot")
+def forgot():
+    tr_link, en_link = template_links()
+    return render_template("forgot.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link)
 
-@app.route("/room/<code>")
+@app.post("/auth/forgot")
+def forgot_post():
+    email = (request.form.get("email") or "").strip().lower()
+    try:
+        validate_email(email)
+    except EmailNotValidError:
+        flash("Geçerli bir e-posta girin."); return redirect(url_for("forgot", lang=get_lang()))
+    import secrets
+    code = f"{secrets.randbelow(10000):04d}"
+    db = SessionLocal()
+    db.add(OTP(email=email, code=code, purpose="reset")); db.commit(); db.close()
+    sent = send_email(email, "Piknik Vakti Şifre Kodu", f"Kodunuz: {code} (10 dk geçerli)")
+    if not sent: flash("SMTP ayarlanmadı; kod loglara yazıldı.")
+    return redirect(url_for("verify_otp", email=email, lang=get_lang()))
+
+@app.get("/auth/verify")
+def verify_otp():
+    tr_link, en_link = template_links()
+    return render_template("verify.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link, email=request.args.get("email",""))
+
+@app.post("/auth/verify")
+def verify_otp_post():
+    email = (request.form.get("email") or "").strip().lower()
+    code = (request.form.get("code") or "").strip()
+    new_pw = request.form.get("new_password") or ""
+    db = SessionLocal()
+    rec = db.query(OTP).filter(OTP.email==email, OTP.code==code, OTP.purpose=="reset", OTP.expires_at > datetime.utcnow()).first()
+    if not rec:
+        db.close(); flash("Kod geçersiz/süresi dolmuş."); return redirect(url_for("verify_otp", email=email, lang=get_lang()))
+    user = db.query(User).filter(User.email==email).first()
+    if not user:
+        db.close(); flash("Kullanıcı yok."); return redirect(url_for("register", lang=get_lang()))
+    if len(new_pw) < 6:
+        db.close(); flash("Yeni şifre en az 6 karakter."); return redirect(url_for("verify_otp", email=email, lang=get_lang()))
+    user.password_hash = hash_pw(new_pw)
+    db.delete(rec); db.commit(); db.close()
+    flash("Şifre güncellendi."); return redirect(url_for("login", lang=get_lang()))
+
+@app.get("/logout")
+def logout():
+    resp = make_response(redirect(url_for("login", lang=get_lang()))); resp.delete_cookie("session"); return resp
+
+@app.get("/room/<code>")
 def room(code):
-    username = request.args.get("username", "guest")
-    lang = request.args.get("lang", "tr")
-    view = request.args.get("view") == "1"
-    return render_template("room.html", code=code, username=username, lang=lang, view=view)
-
-
-# ---------- API ----------
-@app.post("/api/room")
-def api_create_room():
-    data = request.get_json(force=True) or {}
-    code = str(data.get("code", "")).strip()
-    if not code:
-        abort(400, description="code required")
-    owner = (data.get("owner") or "").strip()
-    date  = (data.get("date") or now_iso())[:16]
-    with LOCK:
-        ROOMS.setdefault(code, {"owner": owner, "date": date, "items": []})
-    return "", 201
-
-@app.get("/api/rooms")
-def api_rooms():
-    with LOCK:
-        out = []
-        for c, r in ROOMS.items():
-            out.append({
-                "code": c,
-                "mask": mask(c),
-                "date": r.get("date"),
-                "items": len(r.get("items", []))
-            })
-    return jsonify(out)
+    user = current_user()
+    if not user: return redirect(url_for("login", lang=get_lang()))
+    tr_link, en_link = template_links()
+    return render_template("room.html", t=t, lang=get_lang(), tr_link=tr_link, en_link=en_link, code=code, user=user)
 
 @app.get("/api/room/<code>")
 def api_room(code):
-    with LOCK:
-        r = ROOMS.setdefault(str(code), {"owner": "", "date": now_iso(), "items": []})
-        return jsonify(r)
+    db = SessionLocal()
+    room = db.query(Room).filter(Room.code==code).first()
+    if not room:
+        room = Room(code=code, owner="system")
+        db.add(room); db.commit()
+    items = db.query(Item).filter(Item.room_id==room.id).all()
+    out = [{"id":i.id,"name":i.name,"unit":i.unit,"amount":i.amount,"cat":i.cat,"who":i.who,"state":i.state} for i in items]
+    db.close()
+    return jsonify({"ok":True,"items":out})
 
-@app.post("/api/room/<code>/items")
-def api_add_item(code):
-    data = request.get_json(force=True) or {}
-    name   = (data.get("name") or "").strip()
-    unit   = (data.get("unit") or "").strip()
-    amount = data.get("amount", 0)
-    try:
-        amount = float(amount)
-    except Exception:
-        abort(400, description="amount must be a number")
-    cat    = (data.get("cat") or "Diğer").strip()
-    user   = (data.get("user") or "").strip()
+@app.post("/api/room/<code>/add")
+def api_add(code):
+    db = SessionLocal()
+    room = db.query(Room).filter(Room.code==code).first()
+    if not room:
+        room = Room(code=code, owner="system")
+        db.add(room); db.commit()
+    data = request.json or {}
+    it = Item(room_id=room.id, name=data.get("name","Ürün"), amount=str(data.get("amount","1")))
+    db.add(it); db.commit(); db.close()
+    return jsonify({"ok":True})
 
-    if not name or not unit or not user:
-        abort(400, description="name, unit and user are required")
+@app.get("/service-worker.js")
+def sw():
+    from flask import Response
+    js = open(os.path.join("static","service-worker.js")).read()
+    return Response(js, mimetype="application/javascript")
 
-    with LOCK:
-        r = ROOMS.setdefault(str(code), {"owner": "", "date": now_iso(), "items": []})
-        item = {
-            "id": next(IDGEN),
-            "name": name,
-            "unit": unit,
-            "amount": amount,
-            "cat": cat,
-            "user": user,
-            "state": "needed"
-        }
-        r["items"].append(item)
-    return "", 201
+@app.get("/manifest.json")
+def manifest():
+    return app.send_static_file("manifest.json")
 
-@app.patch("/api/room/<code>/items/<int:item_id>")
-def api_patch_item(code, item_id):
-    data = request.get_json(force=True) or {}
-    user  = data.get("user", "")
-    state = data.get("state", "needed")
-    with LOCK:
-        r = ROOMS.get(str(code))
-        if not r:
-            abort(404)
-        owner = r.get("owner", "")
-        for it in r.get("items", []):
-            if it["id"] == item_id:
-                if user != it["user"] and user != owner:
-                    abort(403)
-                it["state"] = state
-                return "", 204
-    abort(404)
-
-@app.delete("/api/room/<code>/items/<int:item_id>")
-def api_del_item(code, item_id):
-    user = request.args.get("user", "")
-    with LOCK:
-        r = ROOMS.get(str(code))
-        if not r:
-            abort(404)
-        owner = r.get("owner", "")
-        for it in list(r.get("items", [])):
-            if it["id"] == item_id:
-                if user != it["user"] and user != owner:
-                    abort(403)
-                r["items"].remove(it)
-                return "", 204
-    abort(404)
-
-
-# ------- Ana çalıştırma -------
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

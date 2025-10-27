@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h1>{{ t('forgot') }}</h1>
+<form method="post" action="{{ url_for('forgot_post', lang=lang) }}" class="card">
+  <label>{{ t('email') }}</label>
+  <input name="email" type="email" required>
+  <button type="submit">{{ t('send_code') }}</button>
+</form>
+{% endblock %}
