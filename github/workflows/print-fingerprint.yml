@@ -1,0 +1,26 @@
+name: Print SHA256 Fingerprint
+on:
+  workflow_dispatch:
+
+jobs:
+  print:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # PEM verdiysen
+      - name: Write PEM from secret
+        if: ${{ secrets.UPLOAD_CERT_PEM != '' }}
+        run: |
+          cat > upload_cert.pem <<'PEM'
+          ${{ secrets.UPLOAD_CERT_PEM }}
+          PEM
+          keytool -printcert -file upload_cert.pem | grep SHA256 | tee -a $GITHUB_STEP_SUMMARY
+
+      # DER base64 verdiysen (alternatif)
+      - name: Write DER from secret (optional)
+        if: ${{ secrets.UPLOAD_CERT_DER_B64 != '' }}
+        run: |
+          echo "${{ secrets.UPLOAD_CERT_DER_B64 }}" | base64 -d > upload_cert.der
+          keytool -printcert -file upload_cert.der | grep SHA256 | tee -a $GITHUB_STEP_SUMMARY

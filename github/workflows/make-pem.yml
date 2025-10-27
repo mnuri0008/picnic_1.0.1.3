@@ -1,0 +1,22 @@
+name: make-pem
+on: workflow_dispatch
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Export PEM certificate from keystore
+        run: |
+          keytool -exportcert -rfc \
+            -alias upload \
+            -keystore signing.keystore \
+            -storepass Tlr5IALRNs16 \
+            -file upload_cert.pem
+
+      - name: Upload PEM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upload_cert
+          path: upload_cert.pem
