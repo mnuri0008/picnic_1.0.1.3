@@ -1,20 +1,34 @@
+# Picnic Vakti — Patch Bundle (SMTP + OTP + Dil Link Fix)
 
-# Piknik Vakti — Animated Icons Patch (CSS‑only)
+Bu paket, orijinal arayüze (kategoriler, ikonlar, room.html) dokunmadan:
+- **Gerçek e‑posta gönderimi** için SMTP entegrasyonu,
+- **4 haneli OTP** ile şifre sıfırlama akışı (10 dk geçerlilik),
+- Jinja'daki `**kwargs` kısıtı nedeniyle oluşan **dil bağlantısı (TR/EN)** hatasını düzeltmek
+amacıyla hazırlanmış yardımcı kodları içerir.
 
-## Kurulum
-1) Bu dosyaları proje kökünde aynı yerlere koyun:
-- `static/anim.css`
-- `static/anim.js`
+## İçerik
+- `server_patch.py` — Mevcut `server.py`nin üstüne eklenebilecek yardımcı fonksiyonlar ve blueprint.
+- `templates/base_patch_example.html` — Sadece dil bağlantılarını güvenli şekilde kuran örnek. 
+  > *Not*: Görsel düzen değişmez. Mevcut `base.html`’ınızda **yalnızca dil butonu satırını** bu örnektekine uyarlayın.
+- `.env.example` — SMTP ortam değişkenleri örneği.
+- `README_SMTP.md` — Gmail/Outlook/Zoho vs. kurulum yönergeleri.
 
-2) `templates/base.html` içinde, ana CSS/JS'den sonra aşağıyı ekleyin:
-```html
-<link rel="stylesheet" href="{{ url_for('static', filename='anim.css') }}">
-<script defer src="{{ url_for('static', filename='anim.js') }}"></script>
-```
+## Hızlı Uygulama
+1) **SMTP ortam değişkenlerini** Render veya lokal `.env` içine girin (aşağıya bak).
+2) `server_patch.py` içindeki `register_patch(app)` fonksiyonunu, uygulama oluşturduğunuz yerde çağırın:
+   ```python
+   # server.py
+   from server_patch import register_patch
+   register_patch(app)
+   ```
+3) `base.html` içinde dil bağlantısı satırlarını aşağıdaki gibi değiştirin:
+   ```html
+   <a class="lang" href="{{ LANG_TR_URL }}">TR</a>
+   <a class="lang" href="{{ LANG_EN_URL }}">EN</a>
+   ```
+4) Şifre sıfırlama için uç noktalar:
+   - `POST /auth/request-reset`  body: `{ "email": "kullanici@..." }`
+   - `POST /auth/verify-reset`   body: `{ "email": "...", "code": "1234" }`
+   - `POST /auth/do-reset`       body: `{ "email": "...", "code": "1234", "new_password": "..." }`
 
-## Kullanım
-Chip köküne `.chip`, ikon elemana `.icon` verin. İsteğe bağlı sınıflar:
-- `.is-breathing` (hafif döngüsel nefes)
-- `.is-highlight` (yumuşak parıltı)
-
-`templates/snippets/chips_snippet.html` içinde örnek blok var.
+`send_mail()` SMTP ENV varsa **gerçekten yollar**, yoksa **log'a yazar**.
